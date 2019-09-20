@@ -14,11 +14,14 @@ func createWindow() *gtk.Window {
     window.Connect("destroy", func(ctx *glib.CallbackContext) {
         gtk.MainQuit()
     })
+    window.Maximize()
 
     vbox := gtk.NewVBox(true, 0)
     window.Add(vbox)
 
     tree = gtk.NewTreeView()
+    tree.SetHeadersVisible(false)
+
     treeStore = gtk.NewTreeStore(gtk.TYPE_STRING)
     tree.SetModel(treeStore)
     var headerColumn *gtk.TreeViewColumn = gtk.NewTreeViewColumn()
@@ -26,6 +29,7 @@ func createWindow() *gtk.Window {
     var headerRenderer *gtk.CellRendererText = gtk.NewCellRendererText()
     headerColumn.PackStart(headerRenderer, true)
     headerColumn.AddAttribute(headerRenderer, "text", 0)
+
     vbox.Add(tree)
 
     editor = gtk.NewTextView()
