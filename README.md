@@ -8,13 +8,13 @@ The initial purpose, as it comes from the name, is to store backups of SMS conve
 Though, it may be used for other purposes too, such as viewing old mailboxes without a need to import them into some e-mail client.
 
 Build
-=====
+-----
 
 ```
 go build -o smstree
 ```
 
 Usage
-=====
+-----
 
 Currently the program accepts one argument: a MBox file to work with.
