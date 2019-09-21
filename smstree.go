@@ -83,7 +83,7 @@ func addEntryFromMBoxMessage(msg *mail.Message) error {
 func readFile(filename string) {
     f, err := os.Open(filename)
     if err != nil {
-        os.Stderr.WriteString("Can't open the mbox file")
+        os.Stderr.WriteString("Can't open the mbox file\n")
         return
     }
     defer f.Close()
@@ -99,13 +99,13 @@ func readFile(filename string) {
 
         msg, err := mail.ReadMessage(messageReader)
         if err != nil {
-            os.Stderr.WriteString("Bad message, skipping")
+            os.Stderr.WriteString("Bad message, skipping\n")
             continue
         }
 
         err = addEntryFromMBoxMessage(msg)
         if err != nil {
-            os.Stderr.WriteString("Message parse error, skipping")
+            os.Stderr.WriteString("Message parse error, skipping\n")
             continue
         }
     }
