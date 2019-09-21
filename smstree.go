@@ -47,7 +47,7 @@ func createWindow() *gtk.Window {
     return window
 }
 
-func decodeHeader(header string) (string, error) {
+func decodeHeader(header string) string {
     scanner := bufio.NewScanner(strings.NewReader(header))
     scanner.Split(bufio.ScanWords)
 
@@ -56,22 +56,20 @@ func decodeHeader(header string) (string, error) {
     for scanner.Scan() {
         decodedWord, err := decoder.Decode(scanner.Text())
         if err != nil {
-            return "", err
+            // probably not encoded, return as is
+            return header
         }
         words = append(words, decodedWord)
     }
 
-    return strings.Join(words, ""), nil
+    return strings.Join(words, "")
 }
 
 func addEntryFromMBoxMessage(msg *mail.Message) error {
     headers := msg.Header
     subject := headers.Get("Subject")
 
-    subject, err := decodeHeader(subject)
-    if err != nil {
-        return err
-    }
+    subject = decodeHeader(subject)
 
     var rowPtr gtk.TreeIter
     treeStore.Append(&rowPtr, nil)
