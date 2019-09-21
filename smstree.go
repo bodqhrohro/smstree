@@ -39,10 +39,16 @@ func createWindow() *gtk.Window {
     headerColumn.PackStart(headerRenderer, true)
     headerColumn.AddAttribute(headerRenderer, "text", 0)
 
-    vbox.Add(tree)
+    treeScroll := gtk.NewScrolledWindow(nil, nil)
+    treeScroll.SetPolicy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
+    treeScroll.Add(tree)
+    vbox.Add(treeScroll)
 
+    editorScroll := gtk.NewScrolledWindow(nil, nil)
+    editorScroll.SetPolicy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
     editor = gtk.NewTextView()
-    vbox.Add(editor)
+    editorScroll.Add(editor)
+    vbox.Add(editorScroll)
 
     return window
 }
