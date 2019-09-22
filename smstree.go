@@ -38,7 +38,7 @@ func createWindow() *gtk.Window {
     tree = gtk.NewTreeView()
 
 
-    treeStore = gtk.NewTreeStore(gtk.TYPE_STRING, gtk.TYPE_STRING)
+    treeStore = gtk.NewTreeStore(gtk.TYPE_STRING, gtk.TYPE_STRING, gtk.TYPE_STRING, gtk.TYPE_STRING)
     tree.SetModel(treeStore)
 
     var headerColumn *gtk.TreeViewColumn = gtk.NewTreeViewColumn()
@@ -54,6 +54,22 @@ func createWindow() *gtk.Window {
     var dateRenderer *gtk.CellRendererText = gtk.NewCellRendererText()
     dateColumn.PackEnd(dateRenderer, false)
     dateColumn.AddAttribute(dateRenderer, "text", 1)
+
+    var fromColumn *gtk.TreeViewColumn = gtk.NewTreeViewColumn()
+    fromColumn.SetResizable(true)
+    fromColumn.SetTitle("From")
+    tree.AppendColumn(fromColumn)
+    var fromRenderer *gtk.CellRendererText = gtk.NewCellRendererText()
+    fromColumn.PackEnd(fromRenderer, false)
+    fromColumn.AddAttribute(fromRenderer, "text", 2)
+
+    var toColumn *gtk.TreeViewColumn = gtk.NewTreeViewColumn()
+    toColumn.SetResizable(true)
+    toColumn.SetTitle("To")
+    tree.AppendColumn(toColumn)
+    var toRenderer *gtk.CellRendererText = gtk.NewCellRendererText()
+    toColumn.PackEnd(toRenderer, false)
+    toColumn.AddAttribute(toRenderer, "text", 3)
 
 
     treeScroll := gtk.NewScrolledWindow(nil, nil)
@@ -126,9 +142,20 @@ func addEntryFromMBoxMessage(msg *mail.Message) error {
         }
     }
 
+    from, err := headers.AddressList("From")
+    fromFirst := ""
+    if err == nil {
+        fromFirst = from[0].Address
+    }
+    to, err := headers.AddressList("To")
+    toFirst := ""
+    if err == nil {
+        toFirst = to[0].Address
+    }
+
     var rowPtr gtk.TreeIter
     treeStore.Append(&rowPtr, parentPtr)
-    treeStore.Set(&rowPtr, subject, dateTimeShort)
+    treeStore.Set(&rowPtr, subject, dateTimeShort, fromFirst, toFirst)
 
     messageId := headers.Get("Message-ID")
     if messageId != "" {
