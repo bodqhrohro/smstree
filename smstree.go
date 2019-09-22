@@ -18,6 +18,8 @@ var editor *gtk.TextView
 
 var decoder *mime.WordDecoder
 
+var messageIndex map[string]*gtk.TreeIter
+
 func createWindow() *gtk.Window {
     window := gtk.NewWindow(gtk.WINDOW_TOPLEVEL)
     window.Connect("destroy", func(ctx *glib.CallbackContext) {
@@ -73,13 +75,24 @@ func decodeHeader(header string) string {
 
 func addEntryFromMBoxMessage(msg *mail.Message) error {
     headers := msg.Header
-    subject := headers.Get("Subject")
 
+    subject := headers.Get("Subject")
     subject = decodeHeader(subject)
 
+    var parentPtr *gtk.TreeIter = nil
+    inReplyTo := headers.Get("In-Reply-To")
+    if inReplyTo != "" {
+        parentPtr = messageIndex[inReplyTo]
+    }
+
     var rowPtr gtk.TreeIter
-    treeStore.Append(&rowPtr, nil)
+    treeStore.Append(&rowPtr, parentPtr)
     treeStore.SetValue(&rowPtr, 0, subject)
+
+    messageId := headers.Get("Message-ID")
+    if messageId != "" {
+        messageIndex[messageId] = &rowPtr
+    }
 
     return nil
 }
@@ -117,6 +130,7 @@ func readFile(filename string) {
 
 func main() {
     decoder = new(mime.WordDecoder)
+    messageIndex = make(map[string]*gtk.TreeIter)
 
     gtk.Init(nil)
     window := createWindow()
