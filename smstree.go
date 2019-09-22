@@ -8,6 +8,7 @@ import (
     "net/mail"
     "os"
     "io"
+    "io/ioutil"
     "bufio"
     "strings"
     "time"
@@ -16,10 +17,13 @@ import (
 var tree *gtk.TreeView
 var treeStore *gtk.TreeStore
 var editor *gtk.TextView
+var editorBuffer *gtk.TextBuffer
+var treeSelection *gtk.TreeSelection
 
 var decoder *mime.WordDecoder
 
-var messageIndex map[string]*gtk.TreeIter
+var messageIdIndex map[string]*gtk.TreeIter
+var bodyIndex map[string]string
 
 func createWindow() *gtk.Window {
     window := gtk.NewWindow(gtk.WINDOW_TOPLEVEL)
@@ -60,8 +64,23 @@ func createWindow() *gtk.Window {
     editorScroll := gtk.NewScrolledWindow(nil, nil)
     editorScroll.SetPolicy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
     editor = gtk.NewTextView()
+    editorBuffer = editor.GetBuffer()
     editorScroll.Add(editor)
     vbox.Add(editorScroll)
+
+
+    treeSelection = tree.GetSelection()
+    treeSelection.Connect("changed", func() {
+        var selectedRowPtr gtk.TreeIter
+        treeSelection.GetSelected(&selectedRowPtr)
+        body, ok := bodyIndex[treeStore.GetPath(&selectedRowPtr).String()]
+        if ok {
+            editorBuffer.SetText(body)
+        } else {
+            editorBuffer.SetText("")
+        }
+    })
+
 
     return window
 }
@@ -93,7 +112,7 @@ func addEntryFromMBoxMessage(msg *mail.Message) error {
     var parentPtr *gtk.TreeIter = nil
     inReplyTo := headers.Get("In-Reply-To")
     if inReplyTo != "" {
-        parentPtr = messageIndex[inReplyTo]
+        parentPtr = messageIdIndex[inReplyTo]
     }
 
     dateTimeRFC := headers.Get("Date")
@@ -113,7 +132,13 @@ func addEntryFromMBoxMessage(msg *mail.Message) error {
 
     messageId := headers.Get("Message-ID")
     if messageId != "" {
-        messageIndex[messageId] = &rowPtr
+        messageIdIndex[messageId] = &rowPtr
+    }
+
+    body, err := ioutil.ReadAll(msg.Body)
+    if err == nil {
+        body := string(body)
+        bodyIndex[treeStore.GetPath(&rowPtr).String()] = body
     }
 
     return nil
@@ -152,7 +177,8 @@ func readFile(filename string) {
 
 func main() {
     decoder = new(mime.WordDecoder)
-    messageIndex = make(map[string]*gtk.TreeIter)
+    messageIdIndex = make(map[string]*gtk.TreeIter)
+    bodyIndex = make(map[string]string)
 
     gtk.Init(nil)
     window := createWindow()
