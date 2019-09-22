@@ -99,7 +99,7 @@ func addEntryFromMBoxMessage(msg *mail.Message) error {
     dateTimeRFC := headers.Get("Date")
     dateTimeShort := ""
     if dateTimeRFC != "" {
-        dateTime, err := time.Parse(time.RFC1123Z, dateTimeRFC)
+        dateTime, err := time.Parse("Mon, _2 Jan 2006 15:04:05 -0700", dateTimeRFC)
         if err == nil {
             dateTimeShort = dateTime.Format("02/01/2006 15:04:05")
         } else {
