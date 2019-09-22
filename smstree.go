@@ -10,6 +10,7 @@ import (
     "io"
     "bufio"
     "strings"
+    "time"
 )
 
 var tree *gtk.TreeView
@@ -31,15 +32,25 @@ func createWindow() *gtk.Window {
     window.Add(vbox)
 
     tree = gtk.NewTreeView()
-    tree.SetHeadersVisible(false)
 
-    treeStore = gtk.NewTreeStore(gtk.TYPE_STRING)
+
+    treeStore = gtk.NewTreeStore(gtk.TYPE_STRING, gtk.TYPE_STRING)
     tree.SetModel(treeStore)
+
     var headerColumn *gtk.TreeViewColumn = gtk.NewTreeViewColumn()
+    headerColumn.SetResizable(true)
     tree.AppendColumn(headerColumn)
     var headerRenderer *gtk.CellRendererText = gtk.NewCellRendererText()
     headerColumn.PackStart(headerRenderer, true)
     headerColumn.AddAttribute(headerRenderer, "text", 0)
+
+    var dateColumn *gtk.TreeViewColumn = gtk.NewTreeViewColumn()
+    dateColumn.SetTitle("Datetime")
+    tree.AppendColumn(dateColumn)
+    var dateRenderer *gtk.CellRendererText = gtk.NewCellRendererText()
+    dateColumn.PackEnd(dateRenderer, false)
+    dateColumn.AddAttribute(dateRenderer, "text", 1)
+
 
     treeScroll := gtk.NewScrolledWindow(nil, nil)
     treeScroll.SetPolicy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
@@ -85,9 +96,20 @@ func addEntryFromMBoxMessage(msg *mail.Message) error {
         parentPtr = messageIndex[inReplyTo]
     }
 
+    dateTimeRFC := headers.Get("Date")
+    dateTimeShort := ""
+    if dateTimeRFC != "" {
+        dateTime, err := time.Parse(time.RFC1123Z, dateTimeRFC)
+        if err == nil {
+            dateTimeShort = dateTime.Format("02/01/2006 15:04:05")
+        } else {
+            os.Stderr.WriteString(err.Error() + "\n")
+        }
+    }
+
     var rowPtr gtk.TreeIter
     treeStore.Append(&rowPtr, parentPtr)
-    treeStore.SetValue(&rowPtr, 0, subject)
+    treeStore.Set(&rowPtr, subject, dateTimeShort)
 
     messageId := headers.Get("Message-ID")
     if messageId != "" {
