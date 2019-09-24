@@ -20,10 +20,20 @@ var editor *gtk.TextView
 var editorBuffer *gtk.TextBuffer
 var treeSelection *gtk.TreeSelection
 
+var statusbar *gtk.Statusbar
+var errorContext uint
+
+
 var decoder *mime.WordDecoder
 
 var messageIdIndex map[string]*gtk.TreeIter
 var bodyIndex map[string]string
+
+
+func printError(msg string) {
+    statusbar.Push(errorContext, msg)
+    os.Stderr.WriteString(msg + "\n")
+}
 
 func createWindow() *gtk.Window {
     window := gtk.NewWindow(gtk.WINDOW_TOPLEVEL)
@@ -32,7 +42,7 @@ func createWindow() *gtk.Window {
     })
     window.Maximize()
 
-    vbox := gtk.NewVBox(true, 0)
+    vbox := gtk.NewVBox(false, 0)
     window.Add(vbox)
 
     tree = gtk.NewTreeView()
@@ -75,14 +85,14 @@ func createWindow() *gtk.Window {
     treeScroll := gtk.NewScrolledWindow(nil, nil)
     treeScroll.SetPolicy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
     treeScroll.Add(tree)
-    vbox.Add(treeScroll)
+    vbox.PackStart(treeScroll, true, true, 0)
 
     editorScroll := gtk.NewScrolledWindow(nil, nil)
     editorScroll.SetPolicy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
     editor = gtk.NewTextView()
     editorBuffer = editor.GetBuffer()
     editorScroll.Add(editor)
-    vbox.Add(editorScroll)
+    vbox.PackStart(editorScroll, true, true, 0)
 
 
     treeSelection = tree.GetSelection()
@@ -97,6 +107,10 @@ func createWindow() *gtk.Window {
         }
     })
 
+
+    statusbar = gtk.NewStatusbar()
+    errorContext = statusbar.GetContextId("error")
+    vbox.PackEnd(statusbar, false, false, 0)
 
     return window
 }
@@ -138,7 +152,7 @@ func addEntryFromMBoxMessage(msg *mail.Message) error {
         if err == nil {
             dateTimeShort = dateTime.Format("02/01/2006 15:04:05")
         } else {
-            os.Stderr.WriteString(err.Error() + "\n")
+            printError(err.Error())
         }
     }
 
@@ -174,7 +188,7 @@ func addEntryFromMBoxMessage(msg *mail.Message) error {
 func readFile(filename string) {
     f, err := os.Open(filename)
     if err != nil {
-        os.Stderr.WriteString("Can't open the mbox file\n")
+        printError("Can't open the mbox file")
         return
     }
     defer f.Close()
@@ -190,13 +204,13 @@ func readFile(filename string) {
 
         msg, err := mail.ReadMessage(messageReader)
         if err != nil {
-            os.Stderr.WriteString("Bad message, skipping\n")
+            printError("Bad message, skipping")
             continue
         }
 
         err = addEntryFromMBoxMessage(msg)
         if err != nil {
-            os.Stderr.WriteString("Message parse error, skipping\n")
+            printError("Message parse error, skipping")
             continue
         }
     }
