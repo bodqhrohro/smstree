@@ -1,7 +1,19 @@
+// +build !cgocheck
+
 package main
+
+/*
+#include "smstree.go.h"
+#cgo pkg-config: glib-2.0 gobject-2.0 gtk+-2.0
+
+extern gboolean saveCallbackCgo();
+extern gboolean saveRecordCallbackCgo();
+*/
+import "C"
 
 import (
     "github.com/mattn/go-gtk/glib"
+    "github.com/mattn/go-gtk/gdk"
     "github.com/mattn/go-gtk/gtk"
     "github.com/emersion/go-mbox"
     "mime"
@@ -12,7 +24,11 @@ import (
     "bufio"
     "strings"
     "time"
+    "unsafe"
 )
+
+var window *gtk.Window
+var filename string
 
 var tree *gtk.TreeView
 var treeStore *gtk.TreeStore
@@ -23,16 +39,91 @@ var treeSelection *gtk.TreeSelection
 var statusbar *gtk.Statusbar
 var errorContext uint
 
+var currentPath string
+
 
 var decoder *mime.WordDecoder
 
 var messageIdIndex map[string]*gtk.TreeIter
 var bodyIndex map[string]string
 
+var dirtyMessage bool
+var suppressNextEditorChanged bool
+// var suppressNextTreeChanged bool
+
 
 func printError(msg string) {
     statusbar.Push(errorContext, msg)
     os.Stderr.WriteString(msg + "\n")
+}
+
+func getCurrentTreePath() string {
+    var selectedRowPtr gtk.TreeIter
+    treeSelection.GetSelected(&selectedRowPtr)
+    return treeStore.GetPath(&selectedRowPtr).String()
+}
+
+func setDirtyMessage(dirty bool) {
+    if (dirty) {
+        window.SetTitle("*" + formatTitle())
+        tree.SetSensitive(false)
+    } else {
+        window.SetTitle(formatTitle())
+        tree.SetSensitive(true)
+    }
+    dirtyMessage = dirty
+}
+
+func getBufferText(b *gtk.TextBuffer) string {
+    var startIter, endIter gtk.TextIter
+    b.GetStartIter(&startIter)
+    b.GetEndIter(&endIter)
+    return b.GetText(&startIter, &endIter, true)
+}
+
+func saveMessage() {
+    bodyIndex[currentPath] = getBufferText(editorBuffer)
+
+    setDirtyMessage(false)
+}
+
+func confirm(text string) bool {
+    dialog := gtk.NewDialog()
+    dialog.AddButton("Cancel", gtk.RESPONSE_CANCEL)
+    dialog.AddButton("OK", gtk.RESPONSE_OK)
+    dialog.SetDestroyWithParent(true)
+    dialog.SetTitle(text)
+    dialog.SetDefaultSize(500, 30)
+
+    /* label := gtk.NewLabel(text)
+    contentArea := dialog.GetContentArea()
+    contentArea.PackStart(label, true, true, 0)
+    contentArea.Show() */
+
+    response := dialog.Run()
+    dialog.Destroy()
+
+    if response == gtk.RESPONSE_OK {
+        return true
+    } else {
+        return false
+    }
+}
+
+func formatTitle() string {
+    return filename + " — smstree"
+}
+
+func addAccel(window *gtk.Window, key C.uint, modifier gdk.ModifierType, cb unsafe.Pointer) {
+    accelGroup := gtk.NewAccelGroup()
+    C.gtk_accel_group_connect(
+        (*C.GtkAccelGroup)(unsafe.Pointer(accelGroup.GAccelGroup)),
+        key,
+        C.GdkModifierType(modifier),
+        C.GtkAccelFlags(0),
+        C.g_cclosure_new(C.GCallback(cb), nil, nil),
+    )
+    window.AddAccelGroup(accelGroup);
 }
 
 func createWindow() *gtk.Window {
@@ -41,6 +132,7 @@ func createWindow() *gtk.Window {
         gtk.MainQuit()
     })
     window.Maximize()
+    window.SetTitle(formatTitle())
 
     vbox := gtk.NewVBox(false, 0)
     window.Add(vbox)
@@ -97,9 +189,29 @@ func createWindow() *gtk.Window {
 
     treeSelection = tree.GetSelection()
     treeSelection.Connect("changed", func() {
-        var selectedRowPtr gtk.TreeIter
-        treeSelection.GetSelected(&selectedRowPtr)
-        body, ok := bodyIndex[treeStore.GetPath(&selectedRowPtr).String()]
+        /* if suppressNextTreeChanged {
+            suppressNextTreeChanged = false
+            return
+        }
+
+        if dirtyMessage {
+            if confirm("The message was modified. Save?") {
+                saveMessage()
+            } else {
+                suppressNextTreeChanged = true
+
+                go func() {
+                    path := gtk.NewTreePathFromString(currentPath)
+                    tree.SetCursor(path.Copy(), nil, false)
+                    editor.GrabFocus()
+                }()
+
+                return
+            }
+        } */
+        currentPath = getCurrentTreePath()
+        body, ok := bodyIndex[currentPath]
+        suppressNextEditorChanged = true
         if ok {
             editorBuffer.SetText(body)
         } else {
@@ -107,12 +219,39 @@ func createWindow() *gtk.Window {
         }
     })
 
+    editorBuffer.Connect("changed", func() {
+        if suppressNextEditorChanged {
+            if (getBufferText(editorBuffer) != "") {
+                suppressNextEditorChanged = false
+            }
+        } else {
+            setDirtyMessage(true)
+        }
+    })
+
+    addAccel(window, gdk.KEY_s, gdk.CONTROL_MASK, C.saveCallbackCgo)
+    addAccel(window, gdk.KEY_Return, gdk.CONTROL_MASK, C.saveRecordCallbackCgo)
+
 
     statusbar = gtk.NewStatusbar()
     errorContext = statusbar.GetContextId("error")
     vbox.PackEnd(statusbar, false, false, 0)
 
     return window
+}
+
+//export goSaveCallback
+func goSaveCallback() C.gboolean {
+    saveMessage()
+
+    return C.gboolean(1);
+}
+
+//export goSaveRecordCallback
+func goSaveRecordCallback() C.gboolean {
+    saveMessage()
+
+    return C.gboolean(1);
 }
 
 func decodeHeader(header string) string {
@@ -217,16 +356,18 @@ func readFile(filename string) {
 }
 
 func main() {
+    filename = os.Args[1]
+
     decoder = new(mime.WordDecoder)
     messageIdIndex = make(map[string]*gtk.TreeIter)
     bodyIndex = make(map[string]string)
 
     gtk.Init(nil)
-    window := createWindow()
+    window = createWindow()
 
     window.ShowAll()
 
-    readFile(os.Args[1])
+    readFile(filename)
 
     gtk.Main()
 }

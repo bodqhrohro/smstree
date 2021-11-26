@@ -14,7 +14,14 @@ Build
 go build -o smstree
 ```
 
+Make sure to install dependencies needed by [go-gtk](https://github.com/mattn/go-gtk) first.
+
 Usage
 -----
 
 Currently the program accepts one argument: a MBox file to work with.
+
+Keybindings:
+
+* `Ctrl+Enter`: save current entry to RAM
+* `Ctrl+S`: overwrite the MBox file (not implemented yet)
